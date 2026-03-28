@@ -54,19 +54,21 @@
                         <tr>
                             <td class="px-4 py-3">{{ $item->product?->name }}</td>
                             <td class="px-4 py-3">{{ $item->quantity }}</td>
-                            <td class="px-4 py-3">${{ number_format($item->unit_price, 2) }}</td>
-                            <td class="px-4 py-3">${{ number_format($item->total_price, 2) }}</td>
+                            <td class="px-4 py-3">₦{{ number_format($item->unit_price, 2) }}</td>
+                            <td class="px-4 py-3">₦{{ number_format($item->total_price, 2) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
 
             <div class="mt-6 ml-auto max-w-sm space-y-2 text-sm">
-                <div class="flex justify-between"><span class="text-slate-500">Subtotal</span><span>${{ number_format($salesOrder->subtotal, 2) }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Tax</span><span>${{ number_format($salesOrder->tax, 2) }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Discount</span><span>${{ number_format($salesOrder->discount, 2) }}</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Subtotal</span><span>₦{{ number_format($salesOrder->subtotal, 2) }}</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Tax</span><span>₦{{ number_format($salesOrder->tax, 2) }}</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Discount</span><span>₦{{ number_format($salesOrder->discount, 2) }}</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Amount paid</span><span>₦{{ number_format($salesOrder->amount_paid, 2) }}</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Balance impact</span><span>{{ ($salesOrder->amount_paid - $salesOrder->total) > 0 ? '+' : '' }}₦{{ number_format($salesOrder->amount_paid - $salesOrder->total, 2) }}</span></div>
                 <div class="flex justify-between"><span class="text-slate-500">Payment</span><span>{{ $salesOrder->payment_method ? strtoupper($salesOrder->payment_method) : 'Credit / Pay later' }}</span></div>
-                <div class="flex justify-between border-t border-slate-200 pt-3 text-base font-semibold"><span>Total</span><span>${{ number_format($salesOrder->total, 2) }}</span></div>
+                <div class="flex justify-between border-t border-slate-200 pt-3 text-base font-semibold"><span>Total</span><span>₦{{ number_format($salesOrder->total, 2) }}</span></div>
             </div>
 
             <div class="mt-8 flex gap-3 print:hidden">

@@ -24,7 +24,7 @@
     </form>
 
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4 print:grid-cols-2">
-        <x-stat-card title="Total Revenue" :value="'$'.number_format($totalRevenue, 2)" />
+        <x-stat-card title="Total Revenue" :value="'₦'.number_format($totalRevenue, 2)" />
         <x-stat-card title="Delivered Orders" :value="number_format($deliveredCount)" />
         <x-stat-card title="Order Count" :value="number_format($orderCount)" />
         <x-stat-card title="Date Range" :value="request('from') || request('to') ? trim((request('from') ?: 'Start').' - '.(request('to') ?: 'Today')) : 'All time'" />
@@ -37,7 +37,7 @@
                 @forelse ($topCustomers as $name => $value)
                     <div class="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-sm">
                         <span class="text-slate-700">{{ $name ?: 'Unknown customer' }}</span>
-                        <span class="font-semibold text-slate-900">${{ number_format($value, 2) }}</span>
+                        <span class="font-semibold text-slate-900">₦{{ number_format($value, 2) }}</span>
                     </div>
                 @empty
                     <p class="text-sm text-slate-500">No sales data available.</p>
@@ -69,7 +69,7 @@
                 <div class="rounded-2xl bg-slate-50 px-4 py-4 text-sm">
                     <p class="font-medium text-slate-900">{{ $storeName ?: 'Unassigned store' }}</p>
                     <p class="mt-2 text-slate-500">{{ $summary['orders'] }} orders</p>
-                    <p class="mt-1 text-lg font-semibold text-slate-950">${{ number_format($summary['revenue'], 2) }}</p>
+                    <p class="mt-1 text-lg font-semibold text-slate-950">₦{{ number_format($summary['revenue'], 2) }}</p>
                 </div>
             @empty
                 <p class="text-sm text-slate-500">No store sales data available.</p>
@@ -97,7 +97,7 @@
                         <td class="px-6 py-4">{{ $order->customer?->full_name }}</td>
                         <td class="px-6 py-4">{{ optional($order->order_date)->format('M d, Y') }}</td>
                         <td class="px-6 py-4"><x-status-badge :status="$order->status" /></td>
-                        <td class="px-6 py-4">${{ number_format($order->total, 2) }}</td>
+                        <td class="px-6 py-4">₦{{ number_format($order->total, 2) }}</td>
                     </tr>
                 @empty
                     <tr><td colspan="6" class="px-6 py-6 text-center text-slate-500">No sales orders found for this range.</td></tr>

@@ -18,24 +18,29 @@ Route::middleware('guest')->group(function () {
     Route::post('register', [RegisteredUserController::class, 'store']);
 
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
+        ->middleware('installed')
         ->name('login');
 
-    Route::post('login', [AuthenticatedSessionController::class, 'store']);
+    Route::post('login', [AuthenticatedSessionController::class, 'store'])->middleware('installed');
 
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
+        ->middleware('installed')
         ->name('password.request');
 
     Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
+        ->middleware('installed')
         ->name('password.email');
 
     Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
+        ->middleware('installed')
         ->name('password.reset');
 
     Route::post('reset-password', [NewPasswordController::class, 'store'])
+        ->middleware('installed')
         ->name('password.store');
 });
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['installed', 'auth', 'active.access'])->group(function () {
     Route::get('verify-email', EmailVerificationPromptController::class)
         ->name('verification.notice');
 

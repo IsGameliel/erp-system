@@ -51,15 +51,17 @@
                         <td class="px-6 py-4">{{ $salesOrder->user?->name }}</td>
                         <td class="px-6 py-4">{{ optional($salesOrder->order_date)->format('M d, Y') }}</td>
                         <td class="px-6 py-4"><x-status-badge :status="$salesOrder->status" /></td>
-                        <td class="px-6 py-4">${{ number_format($salesOrder->total, 2) }}</td>
+                        <td class="px-6 py-4">₦{{ number_format($salesOrder->total, 2) }}</td>
                         <td class="px-6 py-4 text-right">
                             <div class="flex justify-end gap-3">
                                 <a class="text-cyan-700 hover:text-cyan-900" href="{{ route('sales-orders.edit', $salesOrder) }}">Edit</a>
-                                <form action="{{ route('sales-orders.destroy', $salesOrder) }}" method="POST" onsubmit="return confirm('Delete this sales order?');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button class="text-rose-600 hover:text-rose-800" type="submit">Delete</button>
-                                </form>
+                                @if (auth()->user()->hasRole(\App\Models\User::ROLE_ADMIN))
+                                    <form action="{{ route('sales-orders.destroy', $salesOrder) }}" method="POST" onsubmit="return confirm('Delete this sales order?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button class="text-rose-600 hover:text-rose-800" type="submit">Delete</button>
+                                    </form>
+                                @endif
                             </div>
                         </td>
                     </tr>

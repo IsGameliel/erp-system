@@ -22,6 +22,7 @@ class CustomerFactory extends Factory
             'phone' => fake()->optional()->phoneNumber(),
             'address' => fake()->optional()->address(),
             'customer_type' => fake()->randomElement(['retail', 'wholesale', 'enterprise']),
+            'account_balance' => 0,
             'status' => fake()->randomElement(Customer::STATUSES),
             'notes' => fake()->optional()->sentence(),
             'created_by' => User::factory()->salesOfficer(),

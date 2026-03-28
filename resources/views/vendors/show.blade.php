@@ -26,7 +26,7 @@
             <h3 class="text-lg font-semibold text-slate-950">Summary</h3>
             <div class="mt-4 space-y-4 text-sm">
                 <div><p class="text-slate-500">Purchase orders</p><p class="mt-1 text-2xl font-semibold text-slate-950">{{ $totalPurchaseOrders }}</p></div>
-                <div><p class="text-slate-500">Procurement value</p><p class="mt-1 text-2xl font-semibold text-slate-950">${{ number_format($totalProcurementValue, 2) }}</p></div>
+                <div><p class="text-slate-500">Procurement value</p><p class="mt-1 text-2xl font-semibold text-slate-950">₦{{ number_format($totalProcurementValue, 2) }}</p></div>
                 <div><p class="text-slate-500">Created by</p><p class="mt-1 text-slate-900">{{ $vendor->creator?->name ?: 'System' }}</p></div>
             </div>
         </div>
@@ -53,7 +53,7 @@
                         <td class="px-6 py-4">{{ $order->user?->name }}</td>
                         <td class="px-6 py-4">{{ optional($order->order_date)->format('M d, Y') }}</td>
                         <td class="px-6 py-4"><x-status-badge :status="$order->status" /></td>
-                        <td class="px-6 py-4">${{ number_format($order->total, 2) }}</td>
+                        <td class="px-6 py-4">₦{{ number_format($order->total, 2) }}</td>
                     </tr>
                 @empty
                     <tr><td colspan="5" class="px-6 py-6 text-center text-slate-500">No purchase orders available.</td></tr>

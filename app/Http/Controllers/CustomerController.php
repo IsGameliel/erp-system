@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreCustomerRequest;
 use App\Http\Requests\UpdateCustomerRequest;
 use App\Models\Customer;
+use App\Models\Product;
+use App\Models\Store;
 use App\Services\ActivityLogService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -19,6 +21,7 @@ class CustomerController extends Controller
     {
         $customers = Customer::query()
             ->withCount('salesOrders')
+            ->withCount('productDiscounts')
             ->withSum('salesOrders as total_amount_spent', 'total')
             ->when($request->filled('search'), function ($query) use ($request) {
                 $search = $request->string('search');
@@ -41,7 +44,6 @@ class CustomerController extends Controller
             'customers' => $customers,
             'statuses' => Customer::STATUSES,
             'customerTypes' => Customer::query()->whereNotNull('customer_type')->distinct()->pluck('customer_type')->filter()->values(),
-            'discountAmounts' => Customer::DISCOUNT_AMOUNTS,
         ]);
     }
 
@@ -50,13 +52,18 @@ class CustomerController extends Controller
         return view('customers.create', [
             'customer' => new Customer(),
             'statuses' => Customer::STATUSES,
-            'discountAmounts' => Customer::DISCOUNT_AMOUNTS,
+            'products' => Product::query()->orderBy('name')->get(['id', 'name', 'selling_price']),
+            'stores' => Store::query()->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
     public function store(StoreCustomerRequest $request)
     {
-        $customer = Customer::create($request->validated() + ['created_by' => $request->user()->id]);
+        $customer = Customer::create($request->validated() + [
+            'created_by' => $request->user()->id,
+            'account_balance' => 0,
+        ]);
+        $this->syncProductDiscounts($customer, $request->validated('product_discounts', []));
 
         $this->activityLogService->log($request->user()->id, 'created', 'customers', "Created customer {$customer->full_name}.", $customer);
 
@@ -65,11 +72,18 @@ class CustomerController extends Controller
 
     public function show(Customer $customer)
     {
-        $customer->load([
+        $relations = [
             'creator',
+            'productDiscounts.product',
+            'productDiscounts.store',
             'salesOrders.user',
-            'activityLogs.user',
-        ]);
+        ];
+
+        if (\App\Models\ActivityLog::schemaIsReady()) {
+            $relations[] = 'activityLogs.user';
+        }
+
+        $customer->load($relations);
 
         return view('customers.show', [
             'customer' => $customer,
@@ -81,17 +95,29 @@ class CustomerController extends Controller
     public function edit(Customer $customer)
     {
         return view('customers.edit', [
-            'customer' => $customer,
+            'customer' => $customer->load('productDiscounts.store'),
             'statuses' => Customer::STATUSES,
-            'discountAmounts' => Customer::DISCOUNT_AMOUNTS,
+            'products' => Product::query()->orderBy('name')->get(['id', 'name', 'selling_price']),
+            'stores' => Store::query()->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
     public function update(UpdateCustomerRequest $request, Customer $customer)
     {
-        $customer->update($request->validated());
+        $before = $this->customerSnapshot($customer);
 
-        $this->activityLogService->log($request->user()->id, 'updated', 'customers', "Updated customer {$customer->full_name}.", $customer);
+        $customer->update($request->validated());
+        $this->syncProductDiscounts($customer, $request->validated('product_discounts', []));
+
+        $this->activityLogService->log(
+            $request->user()->id,
+            'updated',
+            'customers',
+            "Updated customer {$customer->full_name}.",
+            $customer,
+            $before,
+            $this->customerSnapshot($customer->fresh(['productDiscounts.product', 'productDiscounts.store']))
+        );
 
         return redirect()->route('customers.show', $customer)->with('success', 'Customer updated successfully.');
     }
@@ -110,5 +136,41 @@ class CustomerController extends Controller
         $this->activityLogService->log($request->user()->id, 'deleted', 'customers', "Deleted customer {$name}.");
 
         return redirect()->route('customers.index')->with('success', 'Customer deleted successfully.');
+    }
+
+    private function syncProductDiscounts(Customer $customer, array $productDiscounts): void
+    {
+        $customer->productDiscounts()->delete();
+
+        if ($productDiscounts === []) {
+            return;
+        }
+
+        $customer->productDiscounts()->createMany($productDiscounts);
+    }
+
+    private function customerSnapshot(Customer $customer): array
+    {
+        $customer->loadMissing(['productDiscounts.product', 'productDiscounts.store']);
+
+        return [
+            'full_name' => $customer->full_name,
+            'business_name' => $customer->business_name,
+            'email' => $customer->email,
+            'phone' => $customer->phone,
+            'address' => $customer->address,
+            'customer_type' => $customer->customer_type,
+            'status' => $customer->status,
+            'notes' => $customer->notes,
+            'product_discounts' => $customer->productDiscounts
+                ->map(fn ($discount) => [
+                    'product' => $discount->product?->name ?? "Product #{$discount->product_id}",
+                    'store' => $discount->store?->name ?? "Store #{$discount->store_id}",
+                    'discount_amount' => (float) $discount->discount_amount,
+                ])
+                ->sortBy(fn ($discount) => $discount['product'].' '.$discount['store'])
+                ->values()
+                ->all(),
+        ];
     }
 }

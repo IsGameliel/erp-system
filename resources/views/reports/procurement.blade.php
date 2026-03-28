@@ -16,7 +16,7 @@
     </form>
 
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4 print:grid-cols-2">
-        <x-stat-card title="Total Cost" :value="'$'.number_format($totalCost, 2)" />
+        <x-stat-card title="Total Cost" :value="'₦'.number_format($totalCost, 2)" />
         <x-stat-card title="Received Orders" :value="number_format($receivedCount)" />
         <x-stat-card title="Order Count" :value="number_format($orderCount)" />
         <x-stat-card title="Date Range" :value="request('from') || request('to') ? trim((request('from') ?: 'Start').' - '.(request('to') ?: 'Today')) : 'All time'" />
@@ -29,7 +29,7 @@
                 @forelse ($topVendors as $name => $value)
                     <div class="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-sm">
                         <span class="text-slate-700">{{ $name ?: 'Unknown vendor' }}</span>
-                        <span class="font-semibold text-slate-900">${{ number_format($value, 2) }}</span>
+                        <span class="font-semibold text-slate-900">₦{{ number_format($value, 2) }}</span>
                     </div>
                 @empty
                     <p class="text-sm text-slate-500">No procurement data available.</p>
@@ -72,7 +72,7 @@
                         <td class="px-6 py-4">{{ $order->vendor?->company_name }}</td>
                         <td class="px-6 py-4">{{ optional($order->order_date)->format('M d, Y') }}</td>
                         <td class="px-6 py-4"><x-status-badge :status="$order->status" /></td>
-                        <td class="px-6 py-4">${{ number_format($order->total, 2) }}</td>
+                        <td class="px-6 py-4">₦{{ number_format($order->total, 2) }}</td>
                     </tr>
                 @empty
                     <tr><td colspan="5" class="px-6 py-6 text-center text-slate-500">No purchase orders found for this range.</td></tr>

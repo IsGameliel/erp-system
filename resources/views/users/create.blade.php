@@ -1,3 +1,5 @@
+@php($routePrefix = request()->routeIs('owner.*') ? 'owner.' : '')
+
 <x-app-layout>
     <x-slot name="header">
         <div>
@@ -6,13 +8,13 @@
         </div>
     </x-slot>
 
-    <form action="{{ route('users.store') }}" class="page-panel space-y-6" method="POST">
+    <form action="{{ route($routePrefix.'users.store') }}" class="page-panel space-y-6" method="POST">
         @csrf
 
         @include('users._form')
 
         <div class="flex justify-end gap-3">
-            <a class="btn-secondary" href="{{ route('users.index') }}">Cancel</a>
+            <a class="btn-secondary" href="{{ route($routePrefix.'users.index') }}">Cancel</a>
             <button class="btn-primary" type="submit">Create user</button>
         </div>
     </form>

@@ -27,17 +27,17 @@
                     <tr>
                         <td>{{ $item->product?->name }}</td>
                         <td>{{ $item->quantity }}</td>
-                        <td>${{ number_format($item->unit_price, 2) }}</td>
-                        <td>${{ number_format($item->total_price, 2) }}</td>
+                        <td>₦{{ number_format($item->unit_price, 2) }}</td>
+                        <td>₦{{ number_format($item->total_price, 2) }}</td>
                     </tr>
                 @endforeach
             </tbody>
         </table>
 
-        <p style="margin-top: 16px;"><strong>Subtotal:</strong> ${{ number_format($salesOrder->subtotal, 2) }}</p>
-        <p><strong>Tax:</strong> ${{ number_format($salesOrder->tax, 2) }}</p>
-        <p><strong>Discount:</strong> ${{ number_format($salesOrder->discount, 2) }}</p>
-        <p><strong>Total:</strong> ${{ number_format($salesOrder->total, 2) }}</p>
+        <p style="margin-top: 16px;"><strong>Subtotal:</strong> ₦{{ number_format($salesOrder->subtotal, 2) }}</p>
+        <p><strong>Tax:</strong> ₦{{ number_format($salesOrder->tax, 2) }}</p>
+        <p><strong>Discount:</strong> ₦{{ number_format($salesOrder->discount, 2) }}</p>
+        <p><strong>Total:</strong> ₦{{ number_format($salesOrder->total, 2) }}</p>
 
         <p>Regards,<br>{{ config('app.name', 'ERP System') }}</p>
     </body>

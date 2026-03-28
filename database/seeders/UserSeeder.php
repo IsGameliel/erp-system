@@ -12,6 +12,11 @@ class UserSeeder extends Seeder
     {
         $users = [
             [
+                'name' => 'Super Admin User',
+                'email' => 'superadmin@example.com',
+                'role' => User::ROLE_SUPER_ADMIN,
+            ],
+            [
                 'name' => 'Admin User',
                 'email' => 'admin@example.com',
                 'role' => User::ROLE_ADMIN,
@@ -34,6 +39,8 @@ class UserSeeder extends Seeder
                 [
                     'name' => $user['name'],
                     'role' => $user['role'],
+                    'access_enabled' => true,
+                    'access_expires_at' => null,
                     'password' => Hash::make('password'),
                     'email_verified_at' => now(),
                 ]

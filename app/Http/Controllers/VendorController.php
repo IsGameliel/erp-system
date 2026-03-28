@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreVendorRequest;
 use App\Http\Requests\UpdateVendorRequest;
+use App\Models\ActivityLog;
 use App\Models\Vendor;
 use App\Services\ActivityLogService;
 use Illuminate\Database\QueryException;
@@ -63,11 +64,16 @@ class VendorController extends Controller
 
     public function show(Vendor $vendor)
     {
-        $vendor->load([
+        $relations = [
             'creator',
             'purchaseOrders.user',
-            'activityLogs.user',
-        ]);
+        ];
+
+        if (ActivityLog::schemaIsReady()) {
+            $relations[] = 'activityLogs.user';
+        }
+
+        $vendor->load($relations);
 
         return view('vendors.show', [
             'vendor' => $vendor,
@@ -86,9 +92,19 @@ class VendorController extends Controller
 
     public function update(UpdateVendorRequest $request, Vendor $vendor)
     {
+        $before = $this->vendorSnapshot($vendor);
+
         $vendor->update($request->validated());
 
-        $this->activityLogService->log($request->user()->id, 'updated', 'vendors', "Updated vendor {$vendor->company_name}.", $vendor);
+        $this->activityLogService->log(
+            $request->user()->id,
+            'updated',
+            'vendors',
+            "Updated vendor {$vendor->company_name}.",
+            $vendor,
+            $before,
+            $this->vendorSnapshot($vendor->fresh())
+        );
 
         return redirect()->route('vendors.show', $vendor)->with('success', 'Vendor updated successfully.');
     }
@@ -107,5 +123,19 @@ class VendorController extends Controller
         $this->activityLogService->log($request->user()->id, 'deleted', 'vendors', "Deleted vendor {$name}.");
 
         return redirect()->route('vendors.index')->with('success', 'Vendor deleted successfully.');
+    }
+
+    private function vendorSnapshot(Vendor $vendor): array
+    {
+        return [
+            'company_name' => $vendor->company_name,
+            'contact_person' => $vendor->contact_person,
+            'email' => $vendor->email,
+            'phone' => $vendor->phone,
+            'address' => $vendor->address,
+            'category' => $vendor->category,
+            'status' => $vendor->status,
+            'notes' => $vendor->notes,
+        ];
     }
 }

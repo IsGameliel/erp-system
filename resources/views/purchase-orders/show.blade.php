@@ -23,10 +23,10 @@
         <div class="page-panel">
             <h3 class="text-lg font-semibold text-slate-950">Totals</h3>
             <div class="mt-4 space-y-3 text-sm">
-                <div class="flex justify-between"><span class="text-slate-500">Subtotal</span><span class="font-medium text-slate-900">${{ number_format($purchaseOrder->subtotal, 2) }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Tax</span><span class="font-medium text-slate-900">${{ number_format($purchaseOrder->tax, 2) }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Discount</span><span class="font-medium text-slate-900">${{ number_format($purchaseOrder->discount, 2) }}</span></div>
-                <div class="flex justify-between border-t border-slate-200 pt-3 text-base"><span class="font-semibold text-slate-700">Total</span><span class="font-semibold text-slate-950">${{ number_format($purchaseOrder->total, 2) }}</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Subtotal</span><span class="font-medium text-slate-900">₦{{ number_format($purchaseOrder->subtotal, 2) }}</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Tax</span><span class="font-medium text-slate-900">₦{{ number_format($purchaseOrder->tax, 2) }}</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Discount</span><span class="font-medium text-slate-900">₦{{ number_format($purchaseOrder->discount, 2) }}</span></div>
+                <div class="flex justify-between border-t border-slate-200 pt-3 text-base"><span class="font-semibold text-slate-700">Total</span><span class="font-semibold text-slate-950">₦{{ number_format($purchaseOrder->total, 2) }}</span></div>
             </div>
         </div>
     </div>
@@ -49,8 +49,8 @@
                     <tr>
                         <td class="px-6 py-4">{{ $item->product?->name }}</td>
                         <td class="px-6 py-4">{{ $item->quantity }}</td>
-                        <td class="px-6 py-4">${{ number_format($item->unit_cost, 2) }}</td>
-                        <td class="px-6 py-4">${{ number_format($item->total_cost, 2) }}</td>
+                        <td class="px-6 py-4">₦{{ number_format($item->unit_cost, 2) }}</td>
+                        <td class="px-6 py-4">₦{{ number_format($item->total_cost, 2) }}</td>
                     </tr>
                 @endforeach
             </tbody>

@@ -33,10 +33,11 @@
                     <th class="px-6 py-3 font-medium">Customer</th>
                     <th class="px-6 py-3 font-medium">Contact</th>
                     <th class="px-6 py-3 font-medium">Type</th>
-                    <th class="px-6 py-3 font-medium">Discount</th>
+                    <th class="px-6 py-3 font-medium">Discounted Products</th>
                     <th class="px-6 py-3 font-medium">Status</th>
                     <th class="px-6 py-3 font-medium">Orders</th>
                     <th class="px-6 py-3 font-medium">Spent</th>
+                    <th class="px-6 py-3 font-medium">Acct balance</th>
                     <th class="px-6 py-3 font-medium"></th>
                 </tr>
             </thead>
@@ -52,10 +53,13 @@
                             <p>{{ $customer->phone }}</p>
                         </td>
                         <td class="px-6 py-4 capitalize">{{ $customer->customer_type ?: 'N/A' }}</td>
-                        <td class="px-6 py-4">{{ $customer->discount_amount ? '$'.number_format($customer->discount_amount, 2) : 'None' }}</td>
+                        <td class="px-6 py-4">{{ $customer->product_discounts_count ? number_format($customer->product_discounts_count).' products' : 'None' }}</td>
                         <td class="px-6 py-4"><x-status-badge :status="$customer->status" /></td>
                         <td class="px-6 py-4">{{ $customer->sales_orders_count }}</td>
-                        <td class="px-6 py-4">${{ number_format($customer->total_amount_spent ?? 0, 2) }}</td>
+                        <td class="px-6 py-4">₦{{ number_format($customer->total_amount_spent ?? 0, 2) }}</td>
+                        <td class="px-6 py-4 font-medium {{ $customer->account_balance < 0 ? 'text-rose-700' : 'text-emerald-700' }}">
+                            {{ $customer->account_balance > 0 ? '+' : '' }}₦{{ number_format($customer->account_balance, 2) }}
+                        </td>
                         <td class="px-6 py-4 text-right">
                             <div class="flex justify-end gap-3">
                                 <a class="text-cyan-700 hover:text-cyan-900" href="{{ route('customers.edit', $customer) }}">Edit</a>
@@ -68,7 +72,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="8" class="px-6 py-6 text-center text-slate-500">No customers found.</td></tr>
+                    <tr><td colspan="9" class="px-6 py-6 text-center text-slate-500">No customers found.</td></tr>
                 @endforelse
             </tbody>
         </table>

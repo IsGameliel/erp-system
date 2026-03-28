@@ -45,8 +45,8 @@ class StoreController extends Controller
     {
         return view('stores.create', [
             'store' => new Store(),
-            'salesOfficers' => User::query()->where('role', User::ROLE_SALES_OFFICER)->orderBy('name')->get(),
-            'procurementOfficers' => User::query()->where('role', User::ROLE_PROCUREMENT_OFFICER)->orderBy('name')->get(),
+            'salesOfficers' => $this->usersForRole(request(), User::ROLE_SALES_OFFICER),
+            'procurementOfficers' => $this->usersForRole(request(), User::ROLE_PROCUREMENT_OFFICER),
             'selectedSalesOfficerIds' => [],
             'selectedProcurementOfficerIds' => [],
         ]);
@@ -77,8 +77,8 @@ class StoreController extends Controller
 
         return view('stores.edit', [
             'store' => $store,
-            'salesOfficers' => User::query()->where('role', User::ROLE_SALES_OFFICER)->orderBy('name')->get(),
-            'procurementOfficers' => User::query()->where('role', User::ROLE_PROCUREMENT_OFFICER)->orderBy('name')->get(),
+            'salesOfficers' => $this->usersForRole(request(), User::ROLE_SALES_OFFICER),
+            'procurementOfficers' => $this->usersForRole(request(), User::ROLE_PROCUREMENT_OFFICER),
             'selectedSalesOfficerIds' => $store->salesOfficers->pluck('id')->all(),
             'selectedProcurementOfficerIds' => $store->procurementOfficers->pluck('id')->all(),
         ]);
@@ -86,6 +86,8 @@ class StoreController extends Controller
 
     public function update(UpdateStoreRequest $request, Store $store)
     {
+        $before = $this->storeSnapshot($store);
+
         DB::transaction(function () use ($request, $store): void {
             $store->update($request->safe()->except(['sales_officer_id', 'procurement_officer_id']));
 
@@ -96,7 +98,15 @@ class StoreController extends Controller
             );
         });
 
-        $this->activityLogService->log($request->user()->id, 'updated', 'stores', "Updated store {$store->name}.", $store);
+        $this->activityLogService->log(
+            $request->user()->id,
+            'updated',
+            'stores',
+            "Updated store {$store->name}.",
+            $store,
+            $before,
+            $this->storeSnapshot($store->fresh(['salesOfficers', 'procurementOfficers']))
+        );
 
         return redirect()->route('stores.index')->with('success', 'Store updated successfully.');
     }
@@ -124,6 +134,7 @@ class StoreController extends Controller
     private function syncAssignments(Store $store, ?int $salesOfficerId, ?int $procurementOfficerId): void
     {
         User::query()
+            ->where('organization_id', auth()->user()?->organization_id)
             ->where('store_id', $store->id)
             ->whereIn('role', [User::ROLE_SALES_OFFICER, User::ROLE_PROCUREMENT_OFFICER])
             ->whereNotIn('id', array_filter([$salesOfficerId, $procurementOfficerId]))
@@ -132,6 +143,7 @@ class StoreController extends Controller
         if ($salesOfficerId) {
             User::query()
                 ->whereKey($salesOfficerId)
+                ->where('organization_id', auth()->user()?->organization_id)
                 ->where('role', User::ROLE_SALES_OFFICER)
                 ->update(['store_id' => $store->id]);
         }
@@ -139,8 +151,31 @@ class StoreController extends Controller
         if ($procurementOfficerId) {
             User::query()
                 ->whereKey($procurementOfficerId)
+                ->where('organization_id', auth()->user()?->organization_id)
                 ->where('role', User::ROLE_PROCUREMENT_OFFICER)
                 ->update(['store_id' => $store->id]);
         }
+    }
+
+    private function usersForRole(Request $request, string $role)
+    {
+        return User::query()
+            ->where('organization_id', $request->user()?->organization_id)
+            ->where('role', $role)
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function storeSnapshot(Store $store): array
+    {
+        $store->loadMissing(['salesOfficers', 'procurementOfficers']);
+
+        return [
+            'name' => $store->name,
+            'code' => $store->code,
+            'location' => $store->location,
+            'sales_officers' => $store->salesOfficers->pluck('name')->sort()->values()->all(),
+            'procurement_officers' => $store->procurementOfficers->pluck('name')->sort()->values()->all(),
+        ];
     }
 }

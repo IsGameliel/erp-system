@@ -31,6 +31,7 @@ class SalesOrderFactory extends Factory
             'tax' => 0,
             'discount' => 0,
             'total' => 0,
+            'amount_paid' => 0,
             'notes' => fake()->optional()->sentence(),
         ];
     }

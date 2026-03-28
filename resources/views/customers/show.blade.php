@@ -26,9 +26,33 @@
             <h3 class="text-lg font-semibold text-slate-950">Summary</h3>
             <div class="mt-4 space-y-4 text-sm">
                 <div><p class="text-slate-500">Total orders</p><p class="mt-1 text-2xl font-semibold text-slate-950">{{ $totalOrders }}</p></div>
-                <div><p class="text-slate-500">Total amount spent</p><p class="mt-1 text-2xl font-semibold text-slate-950">${{ number_format($totalAmountSpent, 2) }}</p></div>
+                <div><p class="text-slate-500">Total amount spent</p><p class="mt-1 text-2xl font-semibold text-slate-950">₦{{ number_format($totalAmountSpent, 2) }}</p></div>
+                <div>
+                    <p class="text-slate-500">Account balance</p>
+                    <p class="mt-1 text-2xl font-semibold {{ $customer->account_balance < 0 ? 'text-rose-700' : 'text-emerald-700' }}">
+                        {{ $customer->account_balance > 0 ? '+' : '' }}₦{{ number_format($customer->account_balance, 2) }}
+                    </p>
+                </div>
+                <div><p class="text-slate-500">Discounted products</p><p class="mt-1 text-2xl font-semibold text-slate-950">{{ $customer->productDiscounts->count() }}</p></div>
                 <div><p class="text-slate-500">Created by</p><p class="mt-1 text-slate-900">{{ $customer->creator?->name ?: 'System' }}</p></div>
             </div>
+        </div>
+    </div>
+
+    <div class="page-panel">
+        <h3 class="text-lg font-semibold text-slate-950">Product discounts</h3>
+        <div class="mt-4 space-y-3">
+            @forelse ($customer->productDiscounts as $discount)
+                <div class="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-sm">
+                    <div>
+                        <p class="font-medium text-slate-900">{{ $discount->product?->name ?? 'Deleted product' }}</p>
+                        <p class="text-slate-500">{{ $discount->store?->name ?? 'No store assigned' }}</p>
+                    </div>
+                    <p class="font-semibold text-slate-900">₦{{ number_format($discount->discount_amount, 2) }}</p>
+                </div>
+            @empty
+                <p class="text-sm text-slate-500">No product-specific discounts saved for this customer.</p>
+            @endforelse
         </div>
     </div>
 
@@ -44,6 +68,8 @@
                     <th class="px-6 py-3 font-medium">Date</th>
                     <th class="px-6 py-3 font-medium">Status</th>
                     <th class="px-6 py-3 font-medium">Total</th>
+                    <th class="px-6 py-3 font-medium">Paid</th>
+                    <th class="px-6 py-3 font-medium">Balance impact</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
@@ -53,10 +79,14 @@
                         <td class="px-6 py-4">{{ $order->user?->name }}</td>
                         <td class="px-6 py-4">{{ optional($order->order_date)->format('M d, Y') }}</td>
                         <td class="px-6 py-4"><x-status-badge :status="$order->status" /></td>
-                        <td class="px-6 py-4">${{ number_format($order->total, 2) }}</td>
+                        <td class="px-6 py-4">₦{{ number_format($order->total, 2) }}</td>
+                        <td class="px-6 py-4">₦{{ number_format($order->amount_paid, 2) }}</td>
+                        <td class="px-6 py-4 font-medium {{ ($order->amount_paid - $order->total) < 0 ? 'text-rose-700' : 'text-emerald-700' }}">
+                            {{ ($order->amount_paid - $order->total) > 0 ? '+' : '' }}₦{{ number_format($order->amount_paid - $order->total, 2) }}
+                        </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="px-6 py-6 text-center text-slate-500">No sales orders available.</td></tr>
+                    <tr><td colspan="7" class="px-6 py-6 text-center text-slate-500">No sales orders available.</td></tr>
                 @endforelse
             </tbody>
         </table>

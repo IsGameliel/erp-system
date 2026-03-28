@@ -17,17 +17,17 @@ class StoreSalesOrderRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
+        $rules = [
             'customer_mode' => ['nullable', Rule::in(['existing', 'new'])],
-            'customer_id' => ['nullable', 'exists:customers,id'],
+            'customer_id' => ['nullable', Rule::exists('tenant.customers', 'id')],
             'store_id' => ['nullable', 'integer', Rule::exists(Store::class, 'id')],
             'order_date' => ['required', 'date'],
             'status' => ['required', Rule::in(SalesOrder::STATUSES)],
             'payment_status' => ['required', Rule::in(SalesOrder::PAYMENT_STATUSES)],
             'payment_method' => ['nullable', Rule::in(SalesOrder::PAYMENT_METHODS)],
             'due_date' => ['nullable', 'date', 'after_or_equal:order_date'],
+            'amount_paid' => ['nullable', 'numeric', 'min:0'],
             'tax' => ['nullable', 'numeric', 'min:0'],
-            'discount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
             'customer.full_name' => ['nullable', 'string', 'max:255'],
             'customer.business_name' => ['nullable', 'string', 'max:255'],
@@ -37,10 +37,16 @@ class StoreSalesOrderRequest extends FormRequest
             'customer.customer_type' => ['nullable', 'string', 'max:100'],
             'customer.notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'exists:products,id'],
+            'items.*.product_id' => ['required', Rule::exists('tenant.products', 'id')],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
         ];
+
+        $rules['discount'] = $this->user()?->hasRole(User::ROLE_ADMIN)
+            ? ['nullable', 'numeric', 'min:0']
+            : ['prohibited'];
+
+        return $rules;
     }
 
     protected function prepareForValidation(): void
@@ -60,6 +66,7 @@ class StoreSalesOrderRequest extends FormRequest
         if ($this->input('payment_status') === SalesOrder::PAYMENT_STATUS_PENDING) {
             $this->merge([
                 'payment_method' => null,
+                'amount_paid' => 0,
             ]);
         }
     }

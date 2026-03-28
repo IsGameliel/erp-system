@@ -3,11 +3,11 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
-class Product extends Model
+class Product extends TenantModel
 {
     use HasFactory;
 
@@ -23,11 +23,17 @@ class Product extends Model
         'name',
         'sku',
         'description',
+        'category_id',
         'selling_price',
         'purchase_price',
         'stock_quantity',
         'status',
     ];
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(ProductCategory::class, 'category_id');
+    }
 
     public function salesOrderItems(): HasMany
     {
@@ -37,6 +43,16 @@ class Product extends Model
     public function purchaseOrderItems(): HasMany
     {
         return $this->hasMany(PurchaseOrderItem::class);
+    }
+
+    public function customerDiscounts(): HasMany
+    {
+        return $this->hasMany(CustomerProductDiscount::class);
+    }
+
+    public function storeQuantities(): HasMany
+    {
+        return $this->hasMany(StoreProductQuantity::class);
     }
 
     public function activityLogs(): MorphMany

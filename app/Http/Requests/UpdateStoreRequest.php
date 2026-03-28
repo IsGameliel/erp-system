@@ -27,12 +27,16 @@ class UpdateStoreRequest extends FormRequest
             'sales_officer_id' => [
                 'nullable',
                 'integer',
-                Rule::exists(User::class, 'id')->where(fn ($query) => $query->where('role', User::ROLE_SALES_OFFICER)),
+                Rule::exists(User::class, 'id')->where(fn ($query) => $query
+                    ->where('organization_id', $this->user()?->organization_id)
+                    ->where('role', User::ROLE_SALES_OFFICER)),
             ],
             'procurement_officer_id' => [
                 'nullable',
                 'integer',
-                Rule::exists(User::class, 'id')->where(fn ($query) => $query->where('role', User::ROLE_PROCUREMENT_OFFICER)),
+                Rule::exists(User::class, 'id')->where(fn ($query) => $query
+                    ->where('organization_id', $this->user()?->organization_id)
+                    ->where('role', User::ROLE_PROCUREMENT_OFFICER)),
             ],
         ];
     }

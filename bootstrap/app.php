@@ -11,8 +11,18 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->web(prepend: [
+            \App\Http\Middleware\ResolveOrganizationFromDomain::class,
+        ]);
+
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
+            'installed' => \App\Http\Middleware\EnsureApplicationIsInstalled::class,
+            'guest.install' => \App\Http\Middleware\RedirectIfApplicationIsInstalled::class,
+            'active.access' => \App\Http\Middleware\EnsureUserHasActiveAccess::class,
+            'owner.host' => \App\Http\Middleware\EnsureOwnerHost::class,
+            'tenant.domain' => \App\Http\Middleware\EnsureTenantDomainAccess::class,
+            'tenant.db' => \App\Http\Middleware\ConnectTenantDatabase::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

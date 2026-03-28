@@ -5,10 +5,12 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreSalesOrderRequest;
 use App\Http\Requests\UpdateSalesOrderRequest;
 use App\Mail\OrderReceiptMail;
+use App\Models\ActivityLog;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\SalesOrder;
 use App\Models\Store;
+use App\Models\StoreProductQuantity;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\InventoryService;
@@ -72,9 +74,9 @@ class SalesOrderController extends Controller
     public function store(StoreSalesOrderRequest $request)
     {
         $salesOrder = DB::transaction(function () use ($request) {
-            [$subtotal, $tax, $discount, $total, $items] = $this->normalizeSalesOrderPayload($request->validated());
             $customer = $this->resolveCustomer($request);
             $storeId = $this->resolveStoreId($request);
+            [$subtotal, $tax, $discount, $total, $amountPaid, $items] = $this->normalizeSalesOrderPayload($request->validated(), $customer, $request->user(), $storeId);
 
             $salesOrder = SalesOrder::create([
                 'order_number' => $this->orderNumberService->salesOrderNumber(),
@@ -90,6 +92,7 @@ class SalesOrderController extends Controller
                 'payment_status' => $request->input('payment_status'),
                 'due_date' => $request->date('due_date'),
                 'total' => $total,
+                'amount_paid' => $amountPaid,
                 'notes' => $request->input('notes'),
             ]);
 
@@ -98,6 +101,7 @@ class SalesOrderController extends Controller
 
             $this->ensureSufficientStock($salesOrder);
             $this->inventoryService->applySalesOrder($salesOrder);
+            $this->refreshCustomerBalance($customer);
 
             return $salesOrder;
         });
@@ -111,7 +115,13 @@ class SalesOrderController extends Controller
     public function show(SalesOrder $salesOrder)
     {
         $this->authorizeSalesOrderAccess(request()->user(), $salesOrder);
-        $salesOrder->load(['customer', 'user', 'store', 'items.product', 'activityLogs.user']);
+        $relations = ['customer', 'user', 'store', 'items.product'];
+
+        if (ActivityLog::schemaIsReady()) {
+            $relations[] = 'activityLogs.user';
+        }
+
+        $salesOrder->load($relations);
 
         return view('sales-orders.show', [
             'salesOrder' => $salesOrder,
@@ -129,14 +139,51 @@ class SalesOrderController extends Controller
     public function update(UpdateSalesOrderRequest $request, SalesOrder $salesOrder)
     {
         $this->authorizeSalesOrderAccess($request->user(), $salesOrder);
+        $before = $this->salesOrderSnapshot($salesOrder);
+
+        if ($request->user()->hasRole(User::ROLE_SALES_OFFICER)) {
+            DB::transaction(function () use ($request, $salesOrder) {
+                $salesOrder->load('items.product');
+                $this->inventoryService->revertSalesOrder($salesOrder);
+
+                $paymentStatus = $request->input('payment_status');
+
+                $salesOrder->update([
+                    'status' => $request->input('status'),
+                    'payment_status' => $paymentStatus,
+                    'payment_method' => $paymentStatus === SalesOrder::PAYMENT_STATUS_PAID ? $request->input('payment_method') : null,
+                    'due_date' => $paymentStatus === SalesOrder::PAYMENT_STATUS_PENDING ? ($salesOrder->due_date ?: $salesOrder->order_date) : null,
+                    'amount_paid' => $paymentStatus === SalesOrder::PAYMENT_STATUS_PAID ? $salesOrder->total : 0,
+                ]);
+
+                $this->ensureSufficientStock($salesOrder->refresh()->load('items.product'));
+                $this->inventoryService->applySalesOrder($salesOrder);
+                $this->refreshCustomerBalance($salesOrder->customer);
+            });
+
+            $salesOrder->refresh();
+
+            $this->activityLogService->log(
+                $request->user()->id,
+                'updated',
+                'sales_orders',
+                "Updated sales order {$salesOrder->order_number}.",
+                $salesOrder,
+                $before,
+                $this->salesOrderSnapshot($salesOrder->fresh(['customer', 'store', 'items.product']))
+            );
+
+            return redirect()->route('sales-orders.receipt', $salesOrder)->with('success', 'Sales order updated successfully.');
+        }
 
         DB::transaction(function () use ($request, $salesOrder) {
             $salesOrder->load('items.product');
             $this->inventoryService->revertSalesOrder($salesOrder);
+            $originalCustomerId = $salesOrder->customer_id;
 
-            [$subtotal, $tax, $discount, $total, $items] = $this->normalizeSalesOrderPayload($request->validated());
             $customer = $this->resolveCustomer($request);
             $storeId = $this->resolveStoreId($request);
+            [$subtotal, $tax, $discount, $total, $amountPaid, $items] = $this->normalizeSalesOrderPayload($request->validated(), $customer, $request->user(), $storeId);
 
             $salesOrder->update([
                 'customer_id' => $customer->id,
@@ -151,6 +198,7 @@ class SalesOrderController extends Controller
                 'payment_status' => $request->input('payment_status'),
                 'due_date' => $request->date('due_date'),
                 'total' => $total,
+                'amount_paid' => $amountPaid,
                 'notes' => $request->input('notes'),
             ]);
 
@@ -160,11 +208,24 @@ class SalesOrderController extends Controller
 
             $this->ensureSufficientStock($salesOrder);
             $this->inventoryService->applySalesOrder($salesOrder);
+            $this->refreshCustomerBalance($customer);
+
+            if ($originalCustomerId !== $customer->id) {
+                $this->refreshCustomerBalance(Customer::findOrFail($originalCustomerId));
+            }
         });
 
         $salesOrder->refresh();
 
-        $this->activityLogService->log($request->user()->id, 'updated', 'sales_orders', "Updated sales order {$salesOrder->order_number}.", $salesOrder);
+        $this->activityLogService->log(
+            $request->user()->id,
+            'updated',
+            'sales_orders',
+            "Updated sales order {$salesOrder->order_number}.",
+            $salesOrder,
+            $before,
+            $this->salesOrderSnapshot($salesOrder->fresh(['customer', 'store', 'items.product']))
+        );
         $this->sendReceiptEmail($salesOrder->load(['customer', 'user', 'store', 'items.product']));
 
         return redirect()->route('sales-orders.receipt', $salesOrder)->with('success', 'Sales order updated successfully.');
@@ -183,12 +244,15 @@ class SalesOrderController extends Controller
     public function destroy(Request $request, SalesOrder $salesOrder)
     {
         $this->authorizeSalesOrderAccess($request->user(), $salesOrder);
+        abort_unless($request->user()->hasRole(User::ROLE_ADMIN), 403);
         $orderNumber = $salesOrder->order_number;
 
         DB::transaction(function () use ($salesOrder) {
             $salesOrder->load('items.product');
             $this->inventoryService->revertSalesOrder($salesOrder);
+            $customer = $salesOrder->customer;
             $salesOrder->delete();
+            $this->refreshCustomerBalance($customer);
         });
 
         $this->activityLogService->log($request->user()->id, 'deleted', 'sales_orders', "Deleted sales order {$orderNumber}.");
@@ -200,7 +264,10 @@ class SalesOrderController extends Controller
     {
         return [
             'salesOrder' => $salesOrder,
-            'customers' => Customer::orderBy('full_name')->get(['id', 'full_name', 'discount_amount']),
+            'customers' => Customer::query()
+                ->with(['productDiscounts:customer_id,product_id,store_id,discount_amount'])
+                ->orderBy('full_name')
+                ->get(['id', 'full_name']),
             'products' => Product::where('status', Product::STATUS_ACTIVE)->orderBy('name')->get(),
             'statuses' => SalesOrder::STATUSES,
             'paymentMethods' => SalesOrder::PAYMENT_METHODS,
@@ -209,16 +276,18 @@ class SalesOrderController extends Controller
         ];
     }
 
-    private function normalizeSalesOrderPayload(array $validated): array
+    private function normalizeSalesOrderPayload(array $validated, Customer $customer, User $user, ?int $storeId): array
     {
         $tax = (float) ($validated['tax'] ?? 0);
-        $discount = (float) ($validated['discount'] ?? 0);
+        $savedDiscount = 0;
+        $manualDiscount = $user->hasRole(User::ROLE_ADMIN) ? (float) ($validated['discount'] ?? 0) : 0;
         $subtotal = 0;
         $items = [];
 
         foreach ($validated['items'] as $item) {
             $lineTotal = (float) $item['quantity'] * (float) $item['unit_price'];
             $subtotal += $lineTotal;
+            $savedDiscount += $this->discountForCustomerProduct($customer, (int) $item['product_id'], $storeId) * (int) $item['quantity'];
             $items[] = [
                 'product_id' => $item['product_id'],
                 'quantity' => $item['quantity'],
@@ -227,9 +296,13 @@ class SalesOrderController extends Controller
             ];
         }
 
+        $discount = $user->hasRole(User::ROLE_ADMIN) ? $manualDiscount : $savedDiscount;
         $total = max(0, $subtotal + $tax - $discount);
+        $amountPaid = ($validated['payment_status'] ?? SalesOrder::PAYMENT_STATUS_PAID) === SalesOrder::PAYMENT_STATUS_PENDING
+            ? 0
+            : (float) ($validated['amount_paid'] ?? $total);
 
-        return [$subtotal, $tax, $discount, $total, $items];
+        return [$subtotal, $tax, $discount, $total, $amountPaid, $items];
     }
 
     private function ensureSufficientStock(SalesOrder $salesOrder): void
@@ -242,6 +315,31 @@ class SalesOrderController extends Controller
             if ($item->quantity > $item->product->stock_quantity) {
                 throw ValidationException::withMessages([
                     'items' => "Insufficient stock for {$item->product->name}.",
+                ]);
+            }
+
+            if (! $salesOrder->store_id) {
+                continue;
+            }
+
+            $storeQuantity = StoreProductQuantity::query()
+                ->where('store_id', $salesOrder->store_id)
+                ->where('product_id', $item->product_id)
+                ->first();
+
+            $hasStoreAllocations = StoreProductQuantity::query()
+                ->where('product_id', $item->product_id)
+                ->exists();
+
+            if ($hasStoreAllocations && ! $storeQuantity) {
+                throw ValidationException::withMessages([
+                    'items' => "{$item->product->name} is not allocated to the selected store.",
+                ]);
+            }
+
+            if ($storeQuantity && $item->quantity > $storeQuantity->quantity) {
+                throw ValidationException::withMessages([
+                    'items' => "Insufficient stock for {$item->product->name} in the selected store.",
                 ]);
             }
         }
@@ -260,6 +358,7 @@ class SalesOrderController extends Controller
             'phone' => $request->input('customer.phone'),
             'address' => $request->input('customer.address'),
             'customer_type' => $request->input('customer.customer_type'),
+            'account_balance' => 0,
             'status' => Customer::STATUS_ACTIVE,
             'notes' => $request->input('customer.notes'),
             'created_by' => $request->user()->id,
@@ -273,6 +372,16 @@ class SalesOrderController extends Controller
         }
 
         return $request->user()->store_id;
+    }
+
+    private function discountForCustomerProduct(Customer $customer, int $productId, ?int $storeId): float
+    {
+        if (! $customer->relationLoaded('productDiscounts')) {
+            $customer->load('productDiscounts');
+        }
+
+        return (float) ($customer->productDiscounts
+            ->first(fn ($discount) => (int) $discount->product_id === $productId && (int) $discount->store_id === (int) $storeId)?->discount_amount ?? 0);
     }
 
     private function authorizeSalesOrderAccess(User $user, SalesOrder $salesOrder): void
@@ -295,5 +404,45 @@ class SalesOrderController extends Controller
         } catch (\Throwable $exception) {
             report($exception);
         }
+    }
+
+    private function refreshCustomerBalance(Customer $customer): void
+    {
+        $balance = (float) ($customer->salesOrders()
+            ->selectRaw('COALESCE(SUM(amount_paid - total), 0) as balance')
+            ->value('balance') ?? 0);
+
+        $customer->update(['account_balance' => $balance]);
+    }
+
+    private function salesOrderSnapshot(SalesOrder $salesOrder): array
+    {
+        $salesOrder->loadMissing(['customer', 'store', 'items.product']);
+
+        return [
+            'customer' => $salesOrder->customer?->full_name,
+            'store' => $salesOrder->store?->name,
+            'order_date' => optional($salesOrder->order_date)->format('Y-m-d'),
+            'status' => $salesOrder->status,
+            'payment_status' => $salesOrder->payment_status,
+            'payment_method' => $salesOrder->payment_method,
+            'due_date' => optional($salesOrder->due_date)->format('Y-m-d'),
+            'subtotal' => (float) $salesOrder->subtotal,
+            'tax' => (float) $salesOrder->tax,
+            'discount' => (float) $salesOrder->discount,
+            'total' => (float) $salesOrder->total,
+            'amount_paid' => (float) $salesOrder->amount_paid,
+            'notes' => $salesOrder->notes,
+            'items' => $salesOrder->items
+                ->map(fn ($item) => [
+                    'product' => $item->product?->name ?? "Product #{$item->product_id}",
+                    'quantity' => (int) $item->quantity,
+                    'unit_price' => (float) $item->unit_price,
+                    'total_price' => (float) $item->total_price,
+                ])
+                ->sortBy('product')
+                ->values()
+                ->all(),
+        ];
     }
 }

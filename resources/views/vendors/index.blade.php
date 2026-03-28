@@ -53,7 +53,7 @@
                         <td class="px-6 py-4 capitalize">{{ $vendor->category ?: 'N/A' }}</td>
                         <td class="px-6 py-4"><x-status-badge :status="$vendor->status" /></td>
                         <td class="px-6 py-4">{{ $vendor->purchase_orders_count }}</td>
-                        <td class="px-6 py-4">${{ number_format($vendor->total_procurement_value ?? 0, 2) }}</td>
+                        <td class="px-6 py-4">₦{{ number_format($vendor->total_procurement_value ?? 0, 2) }}</td>
                         <td class="px-6 py-4 text-right">
                             <div class="flex justify-end gap-3">
                                 <a class="text-cyan-700 hover:text-cyan-900" href="{{ route('vendors.edit', $vendor) }}">Edit</a>

@@ -3,16 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
-class Customer extends Model
+class Customer extends TenantModel
 {
     use HasFactory;
-
-    public const DISCOUNT_AMOUNTS = [100, 200, 500, 1000, 1500];
 
     public const STATUS_ACTIVE = 'active';
     public const STATUS_INACTIVE = 'inactive';
@@ -29,7 +26,7 @@ class Customer extends Model
         'phone',
         'address',
         'customer_type',
-        'discount_amount',
+        'account_balance',
         'status',
         'notes',
         'created_by',
@@ -38,7 +35,7 @@ class Customer extends Model
     protected function casts(): array
     {
         return [
-            'discount_amount' => 'integer',
+            'account_balance' => 'decimal:2',
         ];
     }
 
@@ -50,6 +47,11 @@ class Customer extends Model
     public function salesOrders(): HasMany
     {
         return $this->hasMany(SalesOrder::class);
+    }
+
+    public function productDiscounts(): HasMany
+    {
+        return $this->hasMany(CustomerProductDiscount::class);
     }
 
     public function activityLogs(): MorphMany

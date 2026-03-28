@@ -135,7 +135,7 @@
                 return Math.max(0, this.subtotal() + Number(this.tax || 0) - Number(this.discount || 0));
             },
             currency(value) {
-                return `$${Number(value).toFixed(2)}`;
+                return `₦${Number(value).toFixed(2)}`;
             }
         };
     }

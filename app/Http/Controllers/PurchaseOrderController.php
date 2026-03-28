@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StorePurchaseOrderRequest;
 use App\Http\Requests\UpdatePurchaseOrderRequest;
+use App\Models\ActivityLog;
 use App\Models\Product;
 use App\Models\PurchaseOrder;
 use App\Models\Vendor;
@@ -88,7 +89,13 @@ class PurchaseOrderController extends Controller
 
     public function show(PurchaseOrder $purchaseOrder)
     {
-        $purchaseOrder->load(['vendor', 'user', 'items.product', 'activityLogs.user']);
+        $relations = ['vendor', 'user', 'items.product'];
+
+        if (ActivityLog::schemaIsReady()) {
+            $relations[] = 'activityLogs.user';
+        }
+
+        $purchaseOrder->load($relations);
 
         return view('purchase-orders.show', [
             'purchaseOrder' => $purchaseOrder,
@@ -104,6 +111,8 @@ class PurchaseOrderController extends Controller
 
     public function update(UpdatePurchaseOrderRequest $request, PurchaseOrder $purchaseOrder)
     {
+        $before = $this->purchaseOrderSnapshot($purchaseOrder);
+
         DB::transaction(function () use ($request, $purchaseOrder) {
             $purchaseOrder->load('items.product');
             $this->inventoryService->revertPurchaseOrder($purchaseOrder);
@@ -130,7 +139,15 @@ class PurchaseOrderController extends Controller
 
         $purchaseOrder->refresh();
 
-        $this->activityLogService->log($request->user()->id, 'updated', 'purchase_orders', "Updated purchase order {$purchaseOrder->po_number}.", $purchaseOrder);
+        $this->activityLogService->log(
+            $request->user()->id,
+            'updated',
+            'purchase_orders',
+            "Updated purchase order {$purchaseOrder->po_number}.",
+            $purchaseOrder,
+            $before,
+            $this->purchaseOrderSnapshot($purchaseOrder->fresh(['vendor', 'items.product']))
+        );
 
         return redirect()->route('purchase-orders.show', $purchaseOrder)->with('success', 'Purchase order updated successfully.');
     }
@@ -181,5 +198,31 @@ class PurchaseOrderController extends Controller
         $total = max(0, $subtotal + $tax - $discount);
 
         return [$subtotal, $tax, $discount, $total, $items];
+    }
+
+    private function purchaseOrderSnapshot(PurchaseOrder $purchaseOrder): array
+    {
+        $purchaseOrder->loadMissing(['vendor', 'items.product']);
+
+        return [
+            'vendor' => $purchaseOrder->vendor?->company_name,
+            'order_date' => optional($purchaseOrder->order_date)->format('Y-m-d'),
+            'status' => $purchaseOrder->status,
+            'subtotal' => (float) $purchaseOrder->subtotal,
+            'tax' => (float) $purchaseOrder->tax,
+            'discount' => (float) $purchaseOrder->discount,
+            'total' => (float) $purchaseOrder->total,
+            'notes' => $purchaseOrder->notes,
+            'items' => $purchaseOrder->items
+                ->map(fn ($item) => [
+                    'product' => $item->product?->name ?? "Product #{$item->product_id}",
+                    'quantity' => (int) $item->quantity,
+                    'unit_cost' => (float) $item->unit_cost,
+                    'total_cost' => (float) $item->total_cost,
+                ])
+                ->sortBy('product')
+                ->values()
+                ->all(),
+        ];
     }
 }

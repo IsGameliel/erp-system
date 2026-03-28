@@ -11,6 +11,38 @@ class AdminManagementTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_super_admin_can_open_owner_user_create_page_without_loading_tenant_stores(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create();
+
+        $response = $this
+            ->actingAs($superAdmin)
+            ->get(route('owner.users.create'));
+
+        $response->assertOk();
+        $response->assertViewHas('stores', fn ($stores) => $stores->isEmpty());
+    }
+
+    public function test_super_admin_can_list_owner_users_without_loading_tenant_store_relation(): void
+    {
+        $superAdmin = User::factory()->superAdmin()->create();
+        $store = Store::create([
+            'name' => 'Owner Route Store',
+            'code' => 'OWNER',
+            'location' => 'HQ',
+        ]);
+
+        User::factory()->salesOfficer()->create([
+            'store_id' => $store->id,
+        ]);
+
+        $response = $this
+            ->actingAs($superAdmin)
+            ->get(route('owner.users.index'));
+
+        $response->assertOk();
+    }
+
     public function test_admin_can_create_sales_officer_assigned_to_store(): void
     {
         $admin = User::factory()->admin()->create();

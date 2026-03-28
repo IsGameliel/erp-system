@@ -41,7 +41,7 @@
                         <td class="px-6 py-4">{{ $purchaseOrder->user?->name }}</td>
                         <td class="px-6 py-4">{{ optional($purchaseOrder->order_date)->format('M d, Y') }}</td>
                         <td class="px-6 py-4"><x-status-badge :status="$purchaseOrder->status" /></td>
-                        <td class="px-6 py-4">${{ number_format($purchaseOrder->total, 2) }}</td>
+                        <td class="px-6 py-4">₦{{ number_format($purchaseOrder->total, 2) }}</td>
                         <td class="px-6 py-4 text-right">
                             <div class="flex justify-end gap-3">
                                 <a class="text-cyan-700 hover:text-cyan-900" href="{{ route('purchase-orders.edit', $purchaseOrder) }}">Edit</a>
