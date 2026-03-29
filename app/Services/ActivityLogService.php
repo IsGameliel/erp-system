@@ -20,6 +20,7 @@ class ActivityLogService
     ): ActivityLog {
         [$oldValues, $newValues] = $this->diff($oldValues, $newValues);
         $userRole = $userId ? User::query()->find($userId)?->role : null;
+        $connection = ActivityLog::connectionNameFor($subject, $userRole);
         $payload = [
             'user_id' => $userId,
             'user_role' => $userRole,
@@ -30,16 +31,16 @@ class ActivityLogService
             'subject_type' => $subject ? $subject::class : null,
         ];
 
-        if (ActivityLog::supportsChangeSnapshots()) {
+        if (ActivityLog::supportsChangeSnapshots($subject, $userRole)) {
             $payload['old_values'] = $oldValues === [] ? null : $oldValues;
             $payload['new_values'] = $newValues === [] ? null : $newValues;
         }
 
-        if (! ActivityLog::schemaIsReady()) {
-            return new ActivityLog($payload);
+        if (! ActivityLog::schemaIsReady($subject, $userRole)) {
+            return tap(new ActivityLog($payload), fn (ActivityLog $log) => $log->setConnection($connection));
         }
 
-        return ActivityLog::create($payload);
+        return ActivityLog::on($connection)->create($payload);
     }
 
     public function diff(array $before, array $after): array
